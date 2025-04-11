@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Missão Medida - Super Jogo</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-image: url("ima/fundo.jpg");
+      background-size: cover;
+      background-position: center;
+      text-align: center;
+      padding: 20px;
+      color: #333;
+    }
+
+    h1, #faseTitulo {
+      color: #2a7ca7;
+      text-transform: uppercase;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 30px;
+      margin-top: 20px;
+    }
+
+    .item, .destino {
+      width: 140px;
+      height: 160px;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-weight: bold;
+      background-color: white;
+      text-transform: uppercase;
+    }
+
+    .item {
+      background-color: #fff3cd;
+      cursor: grab;
+    }
+
+    .destino {
+      background-color: #d1ecf1;
+    }
+
+    .destino.hovered {
+      background-color: #a1dbee;
+    }
+
+    #resultado {
+      margin-top: 20px;
+      font-size: 20px;
+    }
+
+    #pontuacao {
+      margin-top: 10px;
+      font-size: 18px;
+      color: #007bff;
+    }
+
+    #proxima, #reiniciar {
+      margin-top: 30px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      display: none;
+    }
+
+    #mensagem {
+      font-weight: bold;
+      margin-top: 15px;
+      font-size: 18px;
+      text-transform: uppercase;
+    }
+
+    canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: none;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌟 MISSÃO MEDIDA: ESTIME, CLASSIFIQUE E VENÇA!</h1>
+  <p id="faseTitulo"></p>
+  <p id="mensagem">ARRASTE CADA RETÂNGULO ATÉ SUA ESTIMATIVA CORRETA!</p>
+
+  <div class="container" id="itens"></div>
+  <div class="container" id="destinos"></div>
+
+  <div id="resultado"></div>
+  <div id="pontuacao">PONTUAÇÃO: 0</div>
+  <button id="proxima" onclick="proximaFase()">PRÓXIMA FASE</button>
+  <button id="reiniciar" onclick="reiniciarJogo()">RECOMEÇAR</button>
+
+  <audio id="acerto" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
+  <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+  <audio id="vitoria" src="sonns/vitoria.mp3"></audio>
+
+  <canvas id="fogos" width="800" height="600"></canvas>
+
+  <script>
+    const fases = [
+      {
+        titulo: "FASE 1: MASSA",
+        itens: [
+          { nome: "BORRACHA", categoria: "leve", img: "imag/borracha.jpg" },
+          { nome: "LIVRO", categoria: "médio", img: "imag/livro.jpg" },
+          { nome: "MELANCIA", categoria: "pesado", img: "imag/melancia.jpg" }
+        ],
+        destinos: ["leve", "médio", "pesado"]
+      },
+      {
+        titulo: "FASE 2: CAPACIDADE",
+        itens: [
+          { nome: "COPO", categoria: "pequena", img: "imag/copo.jpg" },
+          { nome: "GARRAFA", categoria: "média", img: "imag/garrafa.jpg" },
+          { nome: "BALDE", categoria: "grande", img: "imag/balde.jpg" }
+        ],
+        destinos: ["pequena", "média", "grande"]
+      },
+      {
+        titulo: "FASE 3: COMPRIMENTO",
+        itens: [
+          { nome: "CLIPES", categoria: "curto", img: "imag/clipes.jpg" },
+          { nome: "CORDA", categoria: "médio", img: "imag/corda.jpg" },
+          { nome: "MANGUEIRA", categoria: "longo", img: "imag/mangueira.jpg" }
+        ],
+        destinos: ["curto", "médio", "longo"]
+      },
+      {
+        titulo: "FASE 4: MASSA - ALIMENTOS",
+        itens: [
+          { nome: "PÃO", categoria: "leve", img: "imag/pao.jpg" },
+          { nome: "CARNE", categoria: "médio", img: "imag/carne.jpg" },
+          { nome: "SACO DE BATATA", categoria: "pesado", img: "imag/saco_batata.jpg" }
+        ],
+        destinos: ["leve", "médio", "pesado"]
+      },
+      {
+        titulo: "FASE 5: CAPACIDADE - COZINHA",
+        itens: [
+          { nome: "XÍCARA", categoria: "pequena", img: "imag/xicara.jpg" },
+          { nome: "JARRA", categoria: "média", img: "imag/jarra.jpg" },
+          { nome: "PANELA", categoria: "grande", img: "imag/panela.jpg" }
+        ],
+        destinos: ["pequena", "média", "grande"]
+      }
+    ];
+
+    let faseAtual = 0;
+    let pontuacao = 0;
+    let acertosNaFase = 0;
+
+    const itensDiv = document.getElementById('itens');
+    const destinosDiv = document.getElementById('destinos');
+    const resultado = document.getElementById('resultado');
+    const pontuacaoSpan = document.getElementById('pontuacao');
+    const proximaBtn = document.getElementById('proxima');
+    const faseTitulo = document.getElementById('faseTitulo');
+    const somAcerto = document.getElementById('acerto');
+    const somErro = document.getElementById('erro');
+    const somVitoria = document.getElementById('vitoria');
+    const reiniciarBtn = document.getElementById('reiniciar');
+
+    function carregarFase() {
+      const fase = fases[faseAtual];
+      itensDiv.innerHTML = '';
+      destinosDiv.innerHTML = '';
+      faseTitulo.textContent = fase.titulo;
+      acertosNaFase = 0;
+      resultado.textContent = '';
+      proximaBtn.style.display = 'none';
+      reiniciarBtn.style.display = 'none';
+
+      embaralharArray(fase.itens).forEach(obj => {
+        const item = document.createElement('div');
+        item.className = 'item';
+        item.draggable = true;
+        item.dataset.alvo = obj.categoria;
+        item.innerHTML = `<img src="${obj.img}"><span>${obj.nome}</span>`;
+        item.addEventListener('dragstart', dragStart);
+        itensDiv.appendChild(item);
+      });
+
+      embaralharArray(fase.destinos).forEach(dest => {
+        const destino = document.createElement('div');
+        destino.className = 'destino';
+        destino.innerHTML = `<span>${dest.toUpperCase()}</span>`;
+        destino.dataset.tipo = dest;
+        destino.addEventListener('dragover', dragOver);
+        destino.addEventListener('dragleave', dragLeave);
+        destino.addEventListener('drop', drop);
+        destinosDiv.appendChild(destino);
+      });
+    }
+
+    function dragStart(e) {
+      e.dataTransfer.setData('text/plain', e.target.dataset.alvo);
+      e.dataTransfer.setData('text/id', e.target.innerText);
+      e.target.classList.add('dragged');
+    }
+
+    function dragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('hovered');
+    }
+
+    function dragLeave(e) {
+      e.currentTarget.classList.remove('hovered');
+    }
+
+    function drop(e) {
+      e.preventDefault();
+      const tipoDestino = e.currentTarget.dataset.tipo;
+      const tipoItem = e.dataTransfer.getData('text/plain');
+      const itemNome = e.dataTransfer.getData('text/id');
+      e.currentTarget.classList.remove('hovered');
+
+      if (tipoDestino === tipoItem) {
+        resultado.textContent = `✅ CORRETO! ${itemNome} É ${tipoDestino.toUpperCase()}.`;
+        resultado.style.color = "green";
+        pontuacao++;
+        acertosNaFase++;
+        pontuacaoSpan.textContent = "PONTUAÇÃO: " + pontuacao;
+        somAcerto.play();
+
+        const dragged = document.querySelector(".item.dragged");
+        if (dragged) dragged.remove();
+
+        if (acertosNaFase === fases[faseAtual].itens.length) {
+          if (faseAtual < fases.length - 1) {
+            proximaBtn.style.display = 'inline-block';
+          } else {
+            resultado.textContent = "🎉 PARABÉNS! VOCÊ COMPLETOU TODAS AS FASES!";
+            resultado.style.color = "green";
+            somVitoria.play();
+            iniciarFogos();
+            reiniciarBtn.style.display = 'inline-block';
+          }
+        }
+      } else {
+        resultado.textContent = `❌ OPS! ${itemNome} NÃO É DESSA CATEGORIA.`;
+        resultado.style.color = "red";
+        somErro.play();
+      }
+    }
+
+    function proximaFase() {
+      faseAtual++;
+      carregarFase();
+    }
+
+    function reiniciarJogo() {
+      faseAtual = 0;
+      pontuacao = 0;
+      pontuacaoSpan.textContent = "PONTUAÇÃO: 0";
+      carregarFase();
+    }
+
+    function embaralharArray(array) {
+      const copia = [...array];
+      for (let i = copia.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copia[i], copia[j]] = [copia[j], copia[i]];
+      }
+      return copia;
+    }
+
+    function iniciarFogos() {
+      console.log("🎆 Fogos de artifício!");
+    }
+
+    carregarFase();
+  </script>
+</body>
+</html>
